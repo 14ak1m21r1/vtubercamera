@@ -212,11 +212,12 @@ kbd{font:inherit;font-size:11px;font-weight:700;border:1px solid var(--line);bor
       <button data-voice="robot">ロボット</button>
     </div>
     <p class="note">変えた声は、上の「録画」でとった動画に入ります。</p>
-    <label class="check"><input type="checkbox" id="monitor">変えた声をその場で聞く（イヤホンをつけて）</label>
+    <label class="check"><input type="checkbox" id="monitor">声と効果音をその場で聞く（イヤホンをつけて）</label>
 
     <h2>効果音</h2>
     <div class="poses" id="ses"></div>
-    <p class="note">効果音は「録画」の動画にも入ります。キーボードでは、シフトキーをおしながら数字キーで鳴ります。</p>
+    <p class="note">効果音は「録画」の動画に入ります。その場では鳴りません。聞きたいときは、「声を変える」の下のチェックを入れます。キーボードでは、シフトキーをおしながら数字キーで鳴ります。</p>
+    <label class="check"><input type="checkbox" id="autoSE" checked>動きに合わせて効果音をつける（ジャンプ・はくしゅ・たおれる）</label>
 
     <h2>見た目</h2>
     <div class="sw" id="bgs" role="group" aria-label="背景">
@@ -265,7 +266,7 @@ const BG = { green: '#00b140', blue: '#0047bb', white: '#ffffff', black: '#00000
 const st = {
   imgs: {}, pivots: {}, pivotUser: {}, order: DEF_ORDER.slice(), exParent: { ex1: 'head', ex2: 'body' },
   doc: null, sample: false, view: 'make', sel: 'body', mode: 'auto', auto: 'calm',
-  bg: 'mat', bgImg: null, zoom: 1, ox: 0, oy: 0, amount: 1, thr: 0.14, voice: 'off', offs: {},
+  bg: 'mat', bgImg: null, zoom: 1, ox: 0, oy: 0, amount: 1, thr: 0.14, voice: 'off', offs: {}, autoSE: true,
 };
 
 /* ---------- small storage layer (stays on this iPad) ---------- */
@@ -305,7 +306,7 @@ function saveSoon() {
   saveTimer = setTimeout(() => {
     DB.set('settings', {
       keys: Object.keys(st.imgs), pivots: st.pivots, pivotUser: st.pivotUser, order: st.order, exParent: st.exParent,
-      doc: st.doc, mode: st.mode, auto: st.auto, bg: st.bg === 'photo' ? 'mat' : st.bg, zoom: st.zoom, ox: st.ox, oy: st.oy, voice: st.voice, offs: st.offs, amount: st.amount, thr: st.thr,
+      doc: st.doc, mode: st.mode, auto: st.auto, bg: st.bg === 'photo' ? 'mat' : st.bg, zoom: st.zoom, ox: st.ox, oy: st.oy, voice: st.voice, offs: st.offs, autoSE: st.autoSE, amount: st.amount, thr: st.thr,
     });
   }, 400);
 }
@@ -499,7 +500,8 @@ function getAC() {
   if (!audio.ac) {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
     const ac = new AC(); audio.ac = ac; audio.dest = ac.createMediaStreamDestination();
-    audio.se = ac.createGain(); audio.se.gain.value = 0.8; audio.se.connect(ac.destination); audio.se.connect(audio.dest);
+    audio.mon = ac.createGain(); audio.mon.gain.value = $('#monitor').checked ? 1 : 0; audio.mon.connect(ac.destination);
+    audio.se = ac.createGain(); audio.se.gain.value = 0.8; audio.se.connect(audio.dest); audio.se.connect(audio.mon);
   }
   if (audio.ac.state === 'suspended') audio.ac.resume().catch(() => {});
   return audio.ac;
@@ -531,7 +533,8 @@ const SES = [
   { label: 'ガーン', fn: t => { tone(110, t, 1.3, 'sawtooth', .16); tone(116.5, t, 1.3, 'sawtooth', .16); tone(55, t, 1.3, 'triangle', .35); } },
   { label: 'ポン', fn: t => { tone(720, t, .1, 'sine', .4, 300); } },
 ];
-function playSE(i) { const ac = getAC(), se = SES[i]; if (!ac || !se) return; try { se.fn(ac.currentTime + 0.02); } catch (e) {} }
+function playSE(i, delay) { const ac = getAC(), se = SES[i]; if (!ac || !se) return; try { se.fn(ac.currentTime + 0.02 + (delay || 0)); } catch (e) {} }
+const POSE_SE = { jump: [6, 0.15], clap: [2, 0.3], fall: [5, 0.45] };
 
 /* ---------- voice changer: pitch is shifted with two cross-faded moving delays ---------- */
 const vox = { ready: false };
@@ -557,7 +560,7 @@ function buildVoice(ac, src) {
     const osc = ac.createOscillator(); osc.frequency.value = 58; osc.connect(ring.gain); osc.start();
     src.connect(ring); ring.connect(vox.rob);
     out.connect(audio.dest);
-    vox.mon = ac.createGain(); vox.mon.gain.value = $('#monitor').checked ? 1 : 0; out.connect(vox.mon); vox.mon.connect(ac.destination);
+    out.connect(audio.mon);
     vox.P = P; vox.ready = true; setVoice(st.voice);
   } catch (e) { vox.ready = false; }
 }
@@ -611,12 +614,13 @@ async function recSave() {
 
 async function micStart() {
   if (mic.on) return;
-  getAC();
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     toast('このページの置き場所では、マイクが使えません。「話す」ボタンで口を動かせます。', 7000); return;
   }
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true }, video: false });
+    // start from a fresh audio engine made after the microphone opened (the order that worked on iPad)
+    if (audio.ac && !rec.mr) { try { audio.ac.close(); } catch (_) {} audio.ac = null; vox.ready = false; }
     const ac = getAC(); if (ac.state === 'suspended') await ac.resume();
     const src = ac.createMediaStreamSource(stream);
     mic.an = ac.createAnalyser(); mic.an.fftSize = 1024; src.connect(mic.an);
@@ -717,7 +721,11 @@ const KEYS = { all: '12345qwertyuiopn', head: '67890', arm: 'asdfghjklzxcvbm' };
 { const FIX = { jump: 'arrowup', walk: 'arrowdown', banzai: ' ', guts: 'g', dance: 'd', handUp: 'z' }; POSES.forEach(p => { if (FIX[p.id]) p.key = FIX[p.id]; }); }
 const keyName = k => ({ arrowup: '↑', arrowdown: '↓', ' ': 'スペース' }[k] || k.toUpperCase());
 const active = {};
-function fire(id) { if (id === 'flip') { facing = -facing; return; } active[id] = performance.now() / 1000; }
+function fire(id) {
+  if (id === 'flip') { facing = -facing; return; }
+  active[id] = performance.now() / 1000;
+  if (st.autoSE && POSE_SE[id]) playSE(POSE_SE[id][0], POSE_SE[id][1]);
+}
 const poseOk = p => !p.need || (p.any ? p.need.some(loaded) : p.need.every(loaded));
 
 /* ---------- rig state ---------- */
@@ -968,7 +976,7 @@ function renderPlay() {
   $('#touchTools').hidden = st.mode !== 'touch';
   document.querySelectorAll('#bgs [data-bg]').forEach(b => b.setAttribute('aria-pressed', b.dataset.bg === st.bg));
   $('#bgPhoto').setAttribute('aria-pressed', st.bg === 'photo');
-  $('#thr').value = st.thr; $('#zoom').value = st.zoom; $('#oy').value = st.oy; $('#ox').value = st.ox; $('#amt').value = st.amount;
+  $('#thr').value = st.thr; $('#zoom').value = st.zoom; $('#oy').value = st.oy; $('#ox').value = st.ox; $('#autoSE').checked = st.autoSE; $('#amt').value = st.amount;
   $('#thrMark').style.left = (st.thr * 100) + '%';
 }
 function renderAll() {
@@ -1047,7 +1055,8 @@ $('#voices').addEventListener('click', e => {
   setVoice(b.dataset.voice); saveSoon(); renderPlay();
   if (!mic.on && st.voice !== 'off') toast('「マイクを使う」をおすと、声が変わります。');
 });
-$('#monitor').onchange = e => { if (vox.ready) vox.mon.gain.value = e.target.checked ? 1 : 0; };
+$('#monitor').onchange = e => { if (audio.mon) audio.mon.gain.value = e.target.checked ? 1 : 0; };
+$('#autoSE').onchange = e => { st.autoSE = e.target.checked; saveSoon(); };
 $('#recBtn').onclick = () => { if (rec.mr) rec.mr.stop(); else recStart(); };
 $('#saveVid').onclick = recSave;
 $('#dropVid').onclick = () => { rec.blob = null; $('#saveBar').hidden = true; };
@@ -1086,7 +1095,7 @@ $('#back').onclick = () => { document.body.classList.remove('clean'); };
         }
         if (Object.keys(st.imgs).length) {
           Object.assign(st, { pivots: s.pivots || {}, pivotUser: s.pivotUser || {}, exParent: s.exParent || st.exParent,
-            mode: s.mode || 'auto', auto: AUTO[s.auto] ? s.auto : 'calm', bg: s.bg || 'mat', zoom: s.zoom || 1, ox: s.ox || 0, oy: s.oy || 0, voice: s.voice || 'off', offs: s.offs || {}, amount: s.amount || 1, thr: s.thr || 0.14 });
+            mode: s.mode || 'auto', auto: AUTO[s.auto] ? s.auto : 'calm', bg: s.bg || 'mat', zoom: s.zoom || 1, ox: s.ox || 0, oy: s.oy || 0, voice: s.voice || 'off', offs: s.offs || {}, autoSE: s.autoSE !== false, amount: s.amount || 1, thr: s.thr || 0.14 });
           if (Array.isArray(s.order) && s.order.length === DEF_ORDER.length) st.order = s.order;
           st.sel = SLOTS.find(x => loaded(x.id)).id; refreshPivots(); restored = true;
         }
