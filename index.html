@@ -196,7 +196,7 @@ kbd{font:inherit;font-size:11px;font-weight:700;border:1px solid var(--line);bor
     <div class="poses" id="poses"></div>
     <div class="row" id="touchTools" hidden><button class="btn" id="unpose">ポーズをもどす</button></div>
 
-    <p class="note">キーボードがあれば、ボタンに書いてあるキーでも動きます。スペースキーをおしている間は、口が動きます。</p>
+    <p class="note">キーボードがあれば、ボタンに書いてあるキーでも動きます。エンターキーをおしている間は、口が動きます。</p>
 
     <h2>声と口</h2>
     <div class="meter" aria-hidden="true"><span id="lv"></span><em id="thrMark"></em></div>
@@ -714,6 +714,8 @@ POSES.push(
 { const OLD = { waveL: 'arm', waveR: 'arm', banzai: 'arm', clap: 'arm', nod: 'head', tilt: 'head' }; POSES.forEach(p => { p.cat = p.cat || OLD[p.id] || 'all'; }); }
 const KEYS = { all: '12345qwertyuiopn', head: '67890', arm: 'asdfghjklzxcvbm' };
 { const n = { all: 0, head: 0, arm: 0 }; POSES.forEach(p => { p.key = KEYS[p.cat][n[p.cat]++] || ''; }); }
+{ const FIX = { jump: 'arrowup', walk: 'arrowdown', banzai: ' ', guts: 'g', dance: 'd', handUp: 'z' }; POSES.forEach(p => { if (FIX[p.id]) p.key = FIX[p.id]; }); }
+const keyName = k => ({ arrowup: '↑', arrowdown: '↓', ' ': 'スペース' }[k] || k.toUpperCase());
 const active = {};
 function fire(id) { if (id === 'flip') { facing = -facing; return; } active[id] = performance.now() / 1000; }
 const poseOk = p => !p.need || (p.any ? p.need.some(loaded) : p.need.every(loaded));
@@ -947,7 +949,7 @@ const MODE_NOTE = {
   touch: 'うでやかざりは、つまんで回せます。体や頭をなぞると、かたむきます。',
 };
 function poseButtons(heads) {
-  const btn = p => `<button class="btn" data-pose="${p.id}">${esc(p.label)}${p.key ? `<kbd>${p.key.toUpperCase()}</kbd>` : ''}</button>`, flip = '<button class="btn" data-pose="flip">向きを変える<kbd>←→</kbd></button>';
+  const btn = p => `<button class="btn" data-pose="${p.id}">${esc(p.label)}${p.key ? `<kbd>${keyName(p.key)}</kbd>` : ''}</button>`, flip = '<button class="btn" data-pose="flip">向きを変える<kbd>←→</kbd></button>';
   const ok = POSES.filter(poseOk);
   if (!heads) return ok.map(btn).join('') + flip;
   return [['all', '全身'], ['head', '頭'], ['arm', 'うで']].map(([c, name]) => {
@@ -1058,14 +1060,15 @@ const typing = e => { const t = e.target; return t && (t.tagName === 'SELECT' ||
 window.addEventListener('keydown', e => {
   if (st.view !== 'play' || e.metaKey || e.ctrlKey || e.altKey || typing(e)) return;
   const k = keyOf(e);
-  if (k === ' ') { e.preventDefault(); mic.talk = true; return; }
+  if (k === 'enter') { e.preventDefault(); mic.talk = true; return; }
+  if (k.startsWith('arrow') && e.target && e.target.type === 'range') return;
   if (e.repeat) return;
   if (e.shiftKey && /^[0-9]$/.test(k)) { e.preventDefault(); playSE((+k + 9) % 10); return; }
-  if (k === 'arrowleft' || k === 'arrowright') { if (e.target && e.target.type === 'range') return; e.preventDefault(); fire('flip'); return; }
+  if (k === 'arrowleft' || k === 'arrowright') { e.preventDefault(); fire('flip'); return; }
   const p = POSES.find(q => q.key === k && poseOk(q));
   if (p) { e.preventDefault(); fire(p.id); }
 });
-window.addEventListener('keyup', e => { if (keyOf(e) === ' ') { e.preventDefault(); mic.talk = false; } });
+window.addEventListener('keyup', e => { const k = keyOf(e); if (k === ' ' && st.view === 'play') e.preventDefault(); if (k === 'enter') { e.preventDefault(); mic.talk = false; } });
 $('#back').onclick = () => { document.body.classList.remove('clean'); };
 
 /* ---------- boot ---------- */
