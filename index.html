@@ -175,6 +175,11 @@ body.clean #ftalk.show{display:block;left:10px;top:10px;opacity:.5;background:rg
       <button data-mode="touch">指で<br>動かす</button>
     </div>
     <p class="note" id="modeNote"></p>
+    <div class="modes" id="autos" role="group" aria-label="自動の動きの調子">
+      <button data-auto="calm">おちついて</button>
+      <button data-auto="genki">元気に</button>
+      <button data-auto="sleepy">ねむそうに</button>
+    </div>
     <div class="poses" id="poses"></div>
     <div class="row" id="touchTools" hidden><button class="btn" id="unpose">ポーズをもどす</button></div>
 
@@ -229,7 +234,7 @@ const BG = { green: '#00b140', blue: '#0047bb', white: '#ffffff', black: '#00000
 
 const st = {
   imgs: {}, pivots: {}, pivotUser: {}, order: DEF_ORDER.slice(), exParent: { ex1: 'head', ex2: 'body' },
-  doc: null, sample: false, view: 'make', sel: 'body', mode: 'auto',
+  doc: null, sample: false, view: 'make', sel: 'body', mode: 'auto', auto: 'calm',
   bg: 'mat', bgImg: null, zoom: 1, oy: 0, amount: 1, thr: 0.14,
 };
 
@@ -270,7 +275,7 @@ function saveSoon() {
   saveTimer = setTimeout(() => {
     DB.set('settings', {
       keys: Object.keys(st.imgs), pivots: st.pivots, pivotUser: st.pivotUser, order: st.order, exParent: st.exParent,
-      doc: st.doc, mode: st.mode, bg: st.bg === 'photo' ? 'mat' : st.bg, zoom: st.zoom, oy: st.oy, amount: st.amount, thr: st.thr,
+      doc: st.doc, mode: st.mode, auto: st.auto, bg: st.bg === 'photo' ? 'mat' : st.bg, zoom: st.zoom, oy: st.oy, amount: st.amount, thr: st.thr,
     });
   }, 400);
 }
@@ -482,22 +487,34 @@ const POSES = [
       (loaded('foreL') ? T.foreL : T.armL).rot += Math.sin(s * 11) * 20 * h * A; T.head.rot -= 4 * h; } },
   { id: 'waveR', label: '右手をふる', need: ['armR'], dur: 2.6, fn(p, s, T, A) { const h = hold(p, .18, .2); T.armR.rot -= 118 * h * A;
       (loaded('foreR') ? T.foreR : T.armR).rot -= Math.sin(s * 11) * 20 * h * A; T.head.rot += 4 * h; } },
-  { id: 'nod', label: 'うなずく', dur: 1.1, fn(p, s, T, A, u) { const d = Math.pow(Math.sin(p * Math.PI * 2), 2); T.head.ty += d * 16 * u * A; T.head.sy *= 1 - d * 0.045; T.body.ty += d * 3 * u; } },
-  { id: 'tilt', label: '首をかしげる', dur: 1.9, fn(p, s, T, A) { const h = hold(p, .2, .25); T.head.rot += 13 * h * A; T.body.rot += 2 * h; } },
+  { id: 'nod', label: 'うなずく', need: ['head'], dur: 1.1, fn(p, s, T, A, u) { const d = Math.pow(Math.sin(p * Math.PI * 2), 2); T.head.ty += d * 16 * u * A; T.head.sy *= 1 - d * 0.045; T.body.ty += d * 3 * u; } },
+  { id: 'tilt', label: '首をかしげる', need: ['head'], dur: 1.9, fn(p, s, T, A) { const h = hold(p, .2, .25); T.head.rot += 13 * h * A; T.body.rot += 2 * h; } },
   { id: 'banzai', label: 'ばんざい', need: ['armL', 'armR'], any: true, dur: 2.1, fn(p, s, T, A, u) { const h = hold(p, .2, .25);
       T.armL.rot += 150 * h * A; T.armR.rot -= 150 * h * A; T.body.ty -= Math.abs(Math.sin(s * 9)) * 9 * u * h; } },
   { id: 'jump', label: 'ジャンプ', dur: 0.95, fn(p, s, T, A, u) {
-      if (p < .18) T.body.sy *= 1 - .07 * ss(p / .18);
-      else if (p < .82) { const q = (p - .18) / .64, a = Math.sin(q * Math.PI); T.body.ty -= 4 * q * (1 - q) * 120 * u * A; T.body.sy *= 1 + .04 * a; T.armL.rot += 26 * a; T.armR.rot -= 26 * a; }
-      else T.body.sy *= 1 - .06 * (1 - ss((p - .82) / .18)); } },
-  { id: 'bow', label: 'おじぎ', dur: 2.0, fn(p, s, T, A, u) { const h = hold(p, .25, .3); T.head.ty += 24 * u * h * A; T.head.sy *= 1 - .08 * h; T.body.sy *= 1 - .05 * h; } },
+      if (p < .18) T.all.sy *= 1 - .07 * ss(p / .18);
+      else if (p < .82) { const q = (p - .18) / .64, a = Math.sin(q * Math.PI); T.all.ty -= 4 * q * (1 - q) * 120 * u * A; T.all.sy *= 1 + .04 * a; T.armL.rot += 26 * a; T.armR.rot -= 26 * a; }
+      else T.all.sy *= 1 - .06 * (1 - ss((p - .82) / .18)); } },
+  { id: 'bow', label: 'おじぎ', dur: 2.0, fn(p, s, T, A, u) { const h = hold(p, .25, .3); T.head.ty += 24 * u * h * A; T.head.sy *= 1 - .08 * h; T.all.sy *= 1 - .05 * h; } },
+  { id: 'sway', label: '左右にゆれる', dur: 2.4, fn(p, s, T, A) { T.all.rot += Math.sin(s * 7.8) * 7 * hold(p, .15, .2) * A; } },
+  { id: 'joy', label: 'よろこぶ', dur: 1.7, fn(p, s, T, A, u) { const h = hold(p, .12, .2); T.all.ty -= Math.abs(Math.sin(s * 7.4)) * 46 * u * h * A; T.armL.rot += 42 * h * A; T.armR.rot -= 42 * h * A; T.head.rot += Math.sin(s * 7.4) * 4 * h; } },
+  { id: 'shock', label: 'びっくり', dur: 0.9, fn(p, s, T, A, u) { const k = 1 - ss(p); T.all.ty -= 34 * u * k * A; T.all.sy *= 1 + .07 * k; T.all.tx += Math.sin(s * 48) * 7 * u * k * A; T.armL.rot += 30 * k; T.armR.rot -= 30 * k; } },
+  { id: 'shiver', label: 'ふるえる', dur: 1.6, fn(p, s, T, A, u) { T.all.tx += Math.sin(s * 62) * 4.5 * u * hold(p, .1, .25) * A; } },
+  { id: 'droop', label: 'しょんぼり', dur: 2.8, fn(p, s, T, A, u) { const h = hold(p, .25, .25); T.all.sy *= 1 - .05 * h; T.all.rot += 2 * h; T.head.rot += 9 * h * A; T.head.ty += 14 * u * h * A; } },
+  { id: 'spin', label: 'くるっと回る', dur: 1.0, fn(p, s, T) { T.all.sx *= Math.cos(p * Math.PI * 2); } },
+  { id: 'near', label: '近づく', dur: 2.4, fn(p, s, T, A) { const k = 1 + .38 * hold(p, .25, .25) * A; T.all.sx *= k; T.all.sy *= k; } },
+  { id: 'walk', label: '歩くふり', dur: 3.0, fn(p, s, T, A, u) { const h = hold(p, .12, .15), c = Math.sin(s * 7); T.all.ty -= Math.abs(c) * 11 * u * h * A; T.all.rot += c * 3 * h * A; T.armL.rot += c * 16 * h * A; T.armR.rot += c * 16 * h * A; } },
+  { id: 'away', label: '外へ出てもどる', dur: 3.2, fn(p, s, T, A, u) { const h = hold(p, .3, .3); T.all.tx += h * st.doc.w * 2; T.all.rot += Math.sin(p * Math.PI * 2) * 6; T.all.ty -= Math.abs(Math.sin(s * 9)) * 8 * u * Math.sin(p * Math.PI); } },
+  { id: 'clap', label: 'はくしゅ', need: ['armL', 'armR'], dur: 2.0, fn(p, s, T, A) { const h = hold(p, .15, .2), c = Math.sin(s * 22) * 9; T.armL.rot -= (22 + c) * h * A; T.armR.rot += (22 + c) * h * A; } },
 ];
 const active = {};
 const poseOk = p => !p.need || (p.any ? p.need.some(loaded) : p.need.every(loaded));
 
 /* ---------- rig state ---------- */
 const cur = {}, lag = {}, T = {};
-for (const s of SLOTS) { cur[s.id] = { rot: 0, tx: 0, ty: 0, sx: 1, sy: 1 }; T[s.id] = { rot: 0, tx: 0, ty: 0, sx: 1, sy: 1 }; lag[s.id] = 0; }
+for (const id of SLOTS.map(s => s.id).concat('all')) { cur[id] = { rot: 0, tx: 0, ty: 0, sx: 1, sy: 1 }; T[id] = { rot: 0, tx: 0, ty: 0, sx: 1, sy: 1 }; lag[id] = 0; }
+let facing = 1;
+const AUTO = { calm: { sp: 1, am: 1, hop: 0, droop: 0 }, genki: { sp: 1.9, am: 1.7, hop: 14, droop: 0 }, sleepy: { sp: 0.45, am: 1.3, hop: 0, droop: 7 } };
 let held = {};
 const lean = { x: 0, y: 0, on: false };
 let wiggle = { id: null, until: 0 };
@@ -521,13 +538,15 @@ function computeTargets(t) {
     return;
   }
   T.body.sy = 1 + Math.sin(t * 1.7) * 0.006;
+  T.all.sx = facing;
   if (st.mode === 'auto') {
-    const e = mic.env;
-    T.body.rot = Math.sin(t * 0.9) * 1.3 * A; T.body.ty = -e * 9 * u * A;
-    T.head.rot = Math.sin(t * 0.63 + 1.2) * 2.6 * A + Math.sin(t * 7.3) * e * 2.2 * A;
-    T.armL.rot = Math.sin(t * 0.9 + 0.6) * 2.2 * A + e * 3 * A;
-    T.armR.rot = -Math.sin(t * 0.9 + 2.1) * 2.2 * A - e * 3 * A;
-    T.ex1.rot = Math.sin(t * 1.9) * 2.5 * A; T.ex2.rot = Math.sin(t * 1.5 + 1) * 4 * A;
+    const e = mic.env, K = AUTO[st.auto] || AUTO.calm, w = t * K.sp, B = A * K.am;
+    T.all.rot = Math.sin(w * 0.9) * 1.3 * B; T.all.ty = -e * 9 * u * B - Math.abs(Math.sin(w * 2.2)) * K.hop * u * B;
+    T.head.rot = Math.sin(w * 0.63 + 1.2) * 2.6 * B + Math.sin(t * 7.3) * e * 2.2 * A + K.droop * (0.6 + 0.4 * Math.sin(w * 0.5));
+    T.head.ty = K.droop * 1.2 * u;
+    T.armL.rot = Math.sin(w * 0.9 + 0.6) * 2.2 * B + e * 3 * A;
+    T.armR.rot = -Math.sin(w * 0.9 + 2.1) * 2.2 * B - e * 3 * A;
+    T.ex1.rot = Math.sin(w * 1.9) * 2.5 * B; T.ex2.rot = Math.sin(w * 1.5 + 1) * 4 * B;
   } else if (st.mode === 'touch') {
     T.head.rot = lean.x * 14 * A; T.body.rot = lean.x * 5 * A;
     T.head.ty = lean.y * 12 * u * A; T.body.tx = lean.x * 10 * u * A;
@@ -551,11 +570,11 @@ function step(t, dt) {
     const g = id.startsWith('fore') ? 0.45 : 0.9;
     T[id].rot += -g * (cur[par].rot - lag[par]) * st.amount;
   }
-  for (const s of SLOTS) {
-    const c = cur[s.id], o = T[s.id];
+  for (const id in cur) {
+    const c = cur[id], o = T[id];
     c.rot += (o.rot - c.rot) * kf; c.tx += (o.tx - c.tx) * kf; c.ty += (o.ty - c.ty) * kf;
     c.sx += (o.sx - c.sx) * kf; c.sy += (o.sy - c.sy) * kf;
-    lag[s.id] += (c.rot - lag[s.id]) * (1 - Math.exp(-dt * 5));
+    lag[id] += (c.rot - lag[id]) * (1 - Math.exp(-dt * 5));
   }
 }
 
@@ -590,6 +609,10 @@ function draw(t) {
   const fit = Math.min(cw / D.w, ch / D.h) * (make ? 0.86 : 0.92);
   const z = make ? 1 : st.zoom, oy = make ? 0 : st.oy * ch;
   VIEW = new DOMMatrix().translate(cw / 2, ch / 2 + oy).scale(fit * z, fit * z).translate(-D.w / 2, -D.h / 2);
+  if (!make) {
+    const g = cur.all, gp = loaded('body') && st.pivots.body ? st.pivots.body : { x: D.w / 2, y: D.h };
+    VIEW = VIEW.translate(g.tx, g.ty).translate(gp.x, gp.y).rotate(g.rot).scale(g.sx, g.sy).translate(-gp.x, -gp.y);
+  }
   Wm = {}; Pw = {}; shown = {};
   const want = eyesClosed(t) && !make ? (mic.open ? 'd' : 'c') : (mic.open && !make ? 'b' : 'a');
   for (const id of st.order) {
@@ -708,16 +731,18 @@ function renderGuide() {
     : `右のリストで、<b>${esc(s.label)}</b>の絵をえらぼう。`;
 }
 const MODE_NOTE = {
-  auto: 'ゆっくりゆれて、話すとはずみます。',
+  auto: 'ひとりでにゆれて、話すとはずみます。調子をえらべます。',
   btn: 'ボタンをおすと、その動きをします。',
   touch: 'うでやかざりは、つまんで回せます。体や頭をなぞると、かたむきます。',
 };
 function poseButtons() {
-  return POSES.filter(poseOk).map(p => `<button class="btn" data-pose="${p.id}">${esc(p.label)}</button>`).join('');
+  return POSES.filter(poseOk).map(p => `<button class="btn" data-pose="${p.id}">${esc(p.label)}</button>`).join('') + '<button class="btn" data-pose="flip">向きを変える</button>';
 }
 function renderPlay() {
   document.querySelectorAll('.modes button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === st.mode));
   $('#modeNote').textContent = MODE_NOTE[st.mode];
+  $('#autos').hidden = st.mode !== 'auto';
+  document.querySelectorAll('#autos button').forEach(b => b.setAttribute('aria-pressed', b.dataset.auto === st.auto));
   $('#poses').hidden = st.mode !== 'btn'; $('#poses').innerHTML = poseButtons();
   $('#strip').innerHTML = poseButtons(); $('#strip').classList.toggle('show', st.mode === 'btn');
   $('#touchTools').hidden = st.mode !== 'touch';
@@ -769,9 +794,14 @@ document.querySelector('.modes').addEventListener('click', e => {
   const b = e.target.closest('[data-mode]'); if (!b) return;
   st.mode = b.dataset.mode; saveSoon(); renderPlay();
 });
-function firePose(e) { const b = e.target.closest('[data-pose]'); if (b) active[b.dataset.pose] = performance.now() / 1000; }
+function firePose(e) {
+  const b = e.target.closest('[data-pose]'); if (!b) return;
+  if (b.dataset.pose === 'flip') { facing = -facing; return; }
+  active[b.dataset.pose] = performance.now() / 1000;
+}
 $('#poses').addEventListener('click', firePose); $('#strip').addEventListener('click', firePose);
 $('#unpose').onclick = () => { held = {}; };
+$('#autos').addEventListener('click', e => { const b = e.target.closest('[data-auto]'); if (!b) return; st.auto = b.dataset.auto; saveSoon(); renderPlay(); });
 
 $('#thr').oninput = e => { st.thr = +e.target.value; $('#thrMark').style.left = (st.thr * 100) + '%'; saveSoon(); };
 $('#zoom').oninput = e => { st.zoom = +e.target.value; saveSoon(); };
@@ -808,7 +838,7 @@ $('#back').onclick = () => { document.body.classList.remove('clean'); };
         }
         if (Object.keys(st.imgs).length) {
           Object.assign(st, { pivots: s.pivots || {}, pivotUser: s.pivotUser || {}, exParent: s.exParent || st.exParent,
-            mode: s.mode || 'auto', bg: s.bg || 'mat', zoom: s.zoom || 1, oy: s.oy || 0, amount: s.amount || 1, thr: s.thr || 0.14 });
+            mode: s.mode || 'auto', auto: AUTO[s.auto] ? s.auto : 'calm', bg: s.bg || 'mat', zoom: s.zoom || 1, oy: s.oy || 0, amount: s.amount || 1, thr: s.thr || 0.14 });
           if (Array.isArray(s.order) && s.order.length === DEF_ORDER.length) st.order = s.order;
           st.sel = SLOTS.find(x => loaded(x.id)).id; refreshPivots(); restored = true;
         }
