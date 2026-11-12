@@ -99,6 +99,7 @@ details p{font-size:15px;margin:6px 0 10px}
 .modes button[aria-pressed="true"]{background:var(--pick);border-color:var(--pick);color:var(--on-pick)}
 .poses{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}
 .poses .btn{padding:8px 6px}
+.poses h3{grid-column:1/-1;font-size:13px;font-weight:700;color:var(--sub);margin:8px 2px 0}
 .meter{position:relative;height:16px;border-radius:8px;background:var(--chip);overflow:hidden;margin:10px 2px 4px}
 .meter span{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--pick)}
 .meter em{position:absolute;top:-2px;bottom:-2px;width:3px;background:var(--hot)}
@@ -121,6 +122,16 @@ body.clean #strip .btn{flex:none;background:rgba(0,0,0,.5);color:#fff;border-col
 body.clean #ftalk.show{display:block;left:10px;top:10px;opacity:.5;background:rgba(0,0,0,.5);color:#fff;border-color:transparent}
 #toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:min(92vw,560px);background:rgba(10,30,26,.92);color:#fff;padding:10px 16px;border-radius:12px;font-size:15px;display:none;z-index:20}
 #toast.show{display:block}
+kbd{font:inherit;font-size:11px;font-weight:700;border:1px solid var(--line);border-radius:5px;padding:0 5px;margin-left:6px;color:var(--sub);background:var(--chip)}
+.recbtn{border:1.5px solid var(--hot);color:var(--hot);background:var(--panel);border-radius:999px;padding:6px 14px;min-height:40px;font-weight:700;white-space:nowrap}
+.recbtn.on{background:var(--hot);color:#fff}
+#saveBar{position:absolute;left:12px;right:12px;bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-radius:12px;background:rgba(10,30,26,.92);color:#fff}
+#saveBar span{flex:1;min-width:8em}
+.nlabel{flex-basis:100%;font-size:13px;color:var(--sub);margin-top:2px}
+.tools .btn.sq{min-width:44px}
+.voices{grid-template-columns:repeat(2,1fr)}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--sub);margin:8px 2px;min-height:36px}
+.check input{width:22px;height:22px;accent-color:var(--pick)}
 [hidden]{display:none !important}
 </style>
 </head>
@@ -132,6 +143,7 @@ body.clean #ftalk.show{display:block;left:10px;top:10px;opacity:.5;background:rg
     <button id="tabPlay" aria-pressed="false">動かす</button>
   </div>
   <span class="sp"></span>
+  <button class="recbtn" id="recBtn">● 録画</button>
   <button class="micchip" id="micBtn"><i></i><span>マイクを使う</span></button>
 </header>
 
@@ -142,6 +154,7 @@ body.clean #ftalk.show{display:block;left:10px;top:10px;opacity:.5;background:rg
     <button class="float" id="back">もどる</button>
     <button class="float btn" id="ftalk">話す</button>
     <div class="float" id="strip"></div>
+    <div id="saveBar" hidden><span id="saveMsg"></span><button class="btn pri" id="saveVid">動画を保存する</button><button class="btn" id="dropVid">すてる</button></div>
   </div>
 
   <aside class="panel" id="panelMake">
@@ -160,7 +173,7 @@ body.clean #ftalk.show{display:block;left:10px;top:10px;opacity:.5;background:rg
     </details>
     <details>
       <summary>録画のしかた</summary>
-      <p>「動かす」の画面で「画面を広くする」をおしてから、iPad の画面収録で録画します。声も入れるときは、画面収録のマイクをオンにします。</p>
+      <p>上の「録画」をおすと、アバターの画面と声だけが動画になります。ボタンやメニューは入りません。うまくいかないときは、「動かす」の「画面を広くする」をおしてから、iPad の画面収録を使います。</p>
     </details>
     <div class="row" style="margin-top:14px">
       <button class="btn warn" id="resetBtn">ぜんぶ消して見本にもどす</button>
@@ -183,11 +196,23 @@ body.clean #ftalk.show{display:block;left:10px;top:10px;opacity:.5;background:rg
     <div class="poses" id="poses"></div>
     <div class="row" id="touchTools" hidden><button class="btn" id="unpose">ポーズをもどす</button></div>
 
+    <p class="note">キーボードがあれば、ボタンに書いてあるキーでも動きます。スペースキーをおしている間は、口が動きます。</p>
+
     <h2>声と口</h2>
     <div class="meter" aria-hidden="true"><span id="lv"></span><em id="thrMark"></em></div>
     <div class="field"><label for="thr">口が開く<br>声の大きさ</label><input id="thr" type="range" min="0.03" max="0.6" step="0.01"></div>
     <button class="btn talk" id="talk">話す（おしている間、口が動く）</button>
     <p class="note">マイクが使えないときは、このボタンで口を動かせます。</p>
+
+    <h2>声を変える</h2>
+    <div class="modes voices" id="voices" role="group" aria-label="声を変える">
+      <button data-voice="off">そのまま</button>
+      <button data-voice="high">高い声</button>
+      <button data-voice="low">低い声</button>
+      <button data-voice="robot">ロボット</button>
+    </div>
+    <p class="note">変えた声は、上の「録画」でとった動画に入ります。</p>
+    <label class="check"><input type="checkbox" id="monitor">変えた声をその場で聞く（イヤホンをつけて）</label>
 
     <h2>見た目</h2>
     <div class="sw" id="bgs" role="group" aria-label="背景">
@@ -199,6 +224,7 @@ body.clean #ftalk.show{display:block;left:10px;top:10px;opacity:.5;background:rg
       <label id="bgPhoto" aria-label="写真を背景にする">写真<input type="file" accept="image/*" id="bgFile"></label>
     </div>
     <div class="field"><label for="zoom">大きさ</label><input id="zoom" type="range" min="0.5" max="2.2" step="0.01"></div>
+    <div class="field"><label for="ox">左右</label><input id="ox" type="range" min="-0.6" max="0.6" step="0.01"></div>
     <div class="field"><label for="oy">上下</label><input id="oy" type="range" min="-0.6" max="0.6" step="0.01"></div>
     <div class="field"><label for="amt">動きの<br>大きさ</label><input id="amt" type="range" min="0.3" max="1.8" step="0.05"></div>
 
@@ -235,7 +261,7 @@ const BG = { green: '#00b140', blue: '#0047bb', white: '#ffffff', black: '#00000
 const st = {
   imgs: {}, pivots: {}, pivotUser: {}, order: DEF_ORDER.slice(), exParent: { ex1: 'head', ex2: 'body' },
   doc: null, sample: false, view: 'make', sel: 'body', mode: 'auto', auto: 'calm',
-  bg: 'mat', bgImg: null, zoom: 1, oy: 0, amount: 1, thr: 0.14,
+  bg: 'mat', bgImg: null, zoom: 1, ox: 0, oy: 0, amount: 1, thr: 0.14, voice: 'off', offs: {},
 };
 
 /* ---------- small storage layer (stays on this iPad) ---------- */
@@ -275,7 +301,7 @@ function saveSoon() {
   saveTimer = setTimeout(() => {
     DB.set('settings', {
       keys: Object.keys(st.imgs), pivots: st.pivots, pivotUser: st.pivotUser, order: st.order, exParent: st.exParent,
-      doc: st.doc, mode: st.mode, auto: st.auto, bg: st.bg === 'photo' ? 'mat' : st.bg, zoom: st.zoom, oy: st.oy, amount: st.amount, thr: st.thr,
+      doc: st.doc, mode: st.mode, auto: st.auto, bg: st.bg === 'photo' ? 'mat' : st.bg, zoom: st.zoom, ox: st.ox, oy: st.oy, voice: st.voice, offs: st.offs, amount: st.amount, thr: st.thr,
     });
   }, 400);
 }
@@ -333,6 +359,15 @@ async function blobToRec(blob, fixedScale) {
 }
 
 const key = (slot, v) => slot + ':' + (v || 'a');
+const ZERO = { x: 0, y: 0 };
+const offOf = id => st.offs[id] || ZERO;
+const shifted = (b, o) => ({ x0: b.x0 + o.x, y0: b.y0 + o.y, x1: b.x1 + o.x, y1: b.y1 + o.y });
+function nudge(id, a) {
+  const o = offOf(id), d = { nl: [-2, 0], nr: [2, 0], nu: [0, -2], nd: [0, 2] }[a];
+  const n = d ? { x: o.x + d[0], y: o.y + d[1] } : { x: 0, y: 0 };
+  if (st.pivotUser[id] && st.pivots[id]) st.pivots[id] = { x: st.pivots[id].x + n.x - o.x, y: st.pivots[id].y + n.y - o.y };
+  st.offs[id] = n; refreshPivots(); saveSoon();
+}
 const loaded = id => SLOT[id].variants ? SLOT[id].variants.some(([v]) => st.imgs[key(id, v)]) : !!st.imgs[key(id)];
 const parentOf = id => SLOT[id].choose ? st.exParent[id] : SLOT[id].parent;
 function effParent(id) { let p = parentOf(id); while (p && !loaded(p)) p = parentOf(p); return p; }
@@ -343,12 +378,32 @@ function recOf(id, want) {
   return null;
 }
 
+// the joint is where a part overlaps the part it hangs from
+function overlapPivot(id, c, p, oc, op) {
+  const b = c.bbox, bh = b.y1 - b.y0;
+  let ya = b.y0, yb = b.y1;
+  if (id === 'armL' || id === 'armR') yb = b.y0 + bh * 0.3;
+  else if (id === 'head') ya = b.y0 + bh * 0.55;
+  let sx = 0, sy = 0, n = 0;
+  for (let j = 0; j < c.mh; j++) {
+    const y = (j + 0.5) / c.mh * c.h; if (y < ya || y > yb) continue;
+    const pj = Math.floor((y + oc.y - op.y) / p.h * p.mh); if (pj < 0 || pj >= p.mh) continue;
+    for (let i = 0; i < c.mw; i++) {
+      if (c.mask[j * c.mw + i] < 128) continue;
+      const x = (i + 0.5) / c.mw * c.w, pi = Math.floor((x + oc.x - op.x) / p.w * p.mw);
+      if (pi < 0 || pi >= p.mw || p.mask[pj * p.mw + pi] < 128) continue;
+      sx += x + oc.x; sy += y + oc.y; n++;
+    }
+  }
+  return n >= 4 ? { x: sx / n, y: sy / n } : null;
+}
 function defaultPivot(id) {
   const r = recOf(id); if (!r) return null;
-  const b = r.bbox, cx = (b.x0 + b.x1) / 2, bh = b.y1 - b.y0, bw = b.x1 - b.x0;
+  const b = shifted(r.bbox, offOf(id)), cx = (b.x0 + b.x1) / 2, bh = b.y1 - b.y0, bw = b.x1 - b.x0;
   const par = effParent(id), pr = par && recOf(par);
   if (!pr) return { x: cx, y: b.y1 };
-  const pb = pr.bbox, pcx = (pb.x0 + pb.x1) / 2, pcy = (pb.y0 + pb.y1) / 2;
+  const ov = overlapPivot(id, r, pr, offOf(id), offOf(par)); if (ov) return ov;
+  const pb = shifted(pr.bbox, offOf(par)), pcx = (pb.x0 + pb.x1) / 2, pcy = (pb.y0 + pb.y1) / 2;
   if (id === 'head') return { x: clamp(pcx, b.x0, b.x1), y: b.y1 - bh * 0.08 };
   if (id === 'armL' || id === 'armR') {
     const inner = Math.abs(b.x0 - pcx) < Math.abs(b.x1 - pcx) ? b.x0 : b.x1;
@@ -366,7 +421,7 @@ function refreshPivots() {
 function clearAll() {
   for (const k in st.imgs) URL.revokeObjectURL(st.imgs[k].url);
   st.imgs = {}; st.pivots = {}; st.pivotUser = {}; st.order = DEF_ORDER.slice();
-  st.exParent = { ex1: 'head', ex2: 'body' }; st.doc = null; held = {};
+  st.exParent = { ex1: 'head', ex2: 'body' }; st.doc = null; held = {}; st.offs = {};
 }
 
 async function addFile(slot, v, file) {
@@ -386,7 +441,7 @@ async function addFile(slot, v, file) {
 function removeSlot(id) {
   const vs = SLOT[id].variants ? SLOT[id].variants.map(x => x[0]) : ['a'];
   for (const v of vs) { const k = key(id, v); if (st.imgs[k]) { URL.revokeObjectURL(st.imgs[k].url); delete st.imgs[k]; DB.del('img:' + k); } }
-  delete st.pivots[id]; delete st.pivotUser[id];
+  delete st.pivots[id]; delete st.pivotUser[id]; delete st.offs[id];
   if (!Object.keys(st.imgs).length) st.doc = null;
   refreshPivots(); saveSoon(); renderAll();
 }
@@ -434,6 +489,81 @@ async function loadSample() {
 
 /* ---------- voice ---------- */
 const mic = { on: false, an: null, buf: null, level: 0, open: false, lastOpen: 0, talk: false, env: 0 };
+/* ---------- voice changer: pitch is shifted with two cross-faded moving delays ---------- */
+const vox = { ready: false };
+function buildVoice(ac, src) {
+  try {
+    const P = 0.09, N = Math.round(P * ac.sampleRate);
+    const loop = f => { const b = ac.createBuffer(1, N, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < N; i++) d[i] = f(i / N);
+      const s = ac.createBufferSource(); s.buffer = b; s.loop = true; return s; };
+    const out = ac.createGain();
+    vox.dry = ac.createGain(); src.connect(vox.dry); vox.dry.connect(out);
+    vox.pit = ac.createGain(); vox.pit.gain.value = 0; vox.pit.connect(out);
+    vox.d = []; vox.m = [];
+    const t0 = ac.currentTime + 0.05;
+    for (const ph of [0, 0.5]) {
+      const d = ac.createDelay(1), g = ac.createGain(), m = ac.createGain(); g.gain.value = 0; m.gain.value = 0;
+      const ramp = loop(x => (x + ph) % 1), fade = loop(x => 0.5 - 0.5 * Math.cos(2 * Math.PI * ((x + ph) % 1)));
+      ramp.connect(m); m.connect(d.delayTime); fade.connect(g.gain);
+      src.connect(d); d.connect(g); g.connect(vox.pit); ramp.start(t0); fade.start(t0);
+      vox.d.push(d); vox.m.push(m);
+    }
+    vox.rob = ac.createGain(); vox.rob.gain.value = 0; vox.rob.connect(out);
+    const ring = ac.createGain(); ring.gain.value = 0;
+    const osc = ac.createOscillator(); osc.frequency.value = 58; osc.connect(ring.gain); osc.start();
+    src.connect(ring); ring.connect(vox.rob);
+    vox.dest = ac.createMediaStreamDestination(); out.connect(vox.dest);
+    vox.mon = ac.createGain(); vox.mon.gain.value = $('#monitor').checked ? 1 : 0; out.connect(vox.mon); vox.mon.connect(ac.destination);
+    vox.P = P; vox.ready = true; setVoice(st.voice);
+  } catch (e) { vox.ready = false; }
+}
+function setVoice(kind) {
+  st.voice = kind;
+  if (!vox.ready) return;
+  const r = kind === 'high' ? 1.45 : kind === 'low' ? 0.74 : 1, D = Math.abs(r - 1) * vox.P;
+  vox.d.forEach((d, i) => { d.delayTime.value = (r > 1 ? D : 0) + 0.003; vox.m[i].gain.value = r > 1 ? -D : D; });
+  vox.dry.gain.value = kind === 'off' ? 1 : 0; vox.pit.gain.value = r !== 1 ? 1 : 0; vox.rob.gain.value = kind === 'robot' ? 1.6 : 0;
+}
+
+/* ---------- recording: only the stage picture and the (changed) voice ---------- */
+const rec = { mr: null, chunks: [], blob: null, type: '', t0: 0, timer: 0, vt: [] };
+function recLabel() {
+  const b = $('#recBtn'), on = !!rec.mr; b.classList.toggle('on', on);
+  if (!on) { b.textContent = '● 録画'; return; }
+  const s = Math.floor((Date.now() - rec.t0) / 1000); b.textContent = `■ 止める ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+function recStart() {
+  if (!window.MediaRecorder || !cv.captureStream) { toast('このブラウザでは「録画」が使えません。iPad の画面収録を使ってください。', 7000); return; }
+  try {
+    if (st.view !== 'play') { st.view = 'play'; renderAll(); }
+    rec.vt = cv.captureStream(30).getVideoTracks();
+    const tracks = rec.vt.slice();
+    if (vox.ready) tracks.push(...vox.dest.stream.getAudioTracks()); else toast('マイクを入れていないので、声は入りません。');
+    const type = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+    const mr = new MediaRecorder(new MediaStream(tracks), type ? { mimeType: type } : undefined);
+    rec.type = mr.mimeType || type; rec.chunks = []; rec.blob = null; $('#saveBar').hidden = true;
+    mr.ondataavailable = e => { if (e.data && e.data.size) rec.chunks.push(e.data); };
+    mr.onstop = () => {
+      clearInterval(rec.timer); rec.vt.forEach(t => t.stop());
+      const sec = Math.round((Date.now() - rec.t0) / 1000);
+      rec.blob = new Blob(rec.chunks, { type: rec.type || 'video/mp4' }); rec.mr = null; recLabel();
+      if (rec.blob.size) { $('#saveMsg').textContent = `録画できました（${sec} 秒）。`; $('#saveBar').hidden = false; }
+      else toast('録画できませんでした。iPad の画面収録を使ってください。', 7000);
+    };
+    mr.start(1000); rec.mr = mr; rec.t0 = Date.now(); rec.timer = setInterval(recLabel, 500); recLabel();
+  } catch (e) { rec.mr = null; recLabel(); toast('録画を始められませんでした。iPad の画面収録を使ってください。', 7000); }
+}
+async function recSave() {
+  if (!rec.blob) return;
+  const d = new Date(), z = n => String(n).padStart(2, '0');
+  const name = `avatar-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.${rec.type.includes('mp4') ? 'mp4' : 'webm'}`;
+  try {
+    const file = new File([rec.blob], name, { type: rec.blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(rec.blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+
 async function micStart() {
   if (mic.on) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -446,6 +576,7 @@ async function micStart() {
     const src = ac.createMediaStreamSource(stream);
     mic.an = ac.createAnalyser(); mic.an.fftSize = 1024; src.connect(mic.an);
     mic.buf = new Uint8Array(mic.an.fftSize); mic.on = true; mic.ac = ac;
+    buildVoice(ac, src);
     stream.getAudioTracks().forEach(t => t.addEventListener('ended', () => { mic.on = false; renderMic(); }));
     document.addEventListener('visibilitychange', () => { if (!document.hidden && mic.ac && mic.ac.state !== 'running') mic.ac.resume().catch(() => {}); });
   } catch (e) {
@@ -483,31 +614,63 @@ function eyesClosed(t) {
 
 /* ---------- poses ---------- */
 const POSES = [
-  { id: 'waveL', label: '左手をふる', need: ['armL'], dur: 2.6, fn(p, s, T, A) { const h = hold(p, .18, .2); T.armL.rot += 118 * h * A;
-      (loaded('foreL') ? T.foreL : T.armL).rot += Math.sin(s * 11) * 20 * h * A; T.head.rot -= 4 * h; } },
-  { id: 'waveR', label: '右手をふる', need: ['armR'], dur: 2.6, fn(p, s, T, A) { const h = hold(p, .18, .2); T.armR.rot -= 118 * h * A;
-      (loaded('foreR') ? T.foreR : T.armR).rot -= Math.sin(s * 11) * 20 * h * A; T.head.rot += 4 * h; } },
+  { id: 'waveL', label: '左手をふる', need: ['armL'], dur: 2.6, fn(p, s, T, A) { const h = hold(p, .18, .2); const f = loaded('foreL'), w = Math.sin(s * 10); T.armL.rot += (f ? 95 : 135 + w * 14) * h;
+      if (f) T.foreL.rot += (68 + w * 22) * h; T.head.rot -= 4 * h; } },
+  { id: 'waveR', label: '右手をふる', need: ['armR'], dur: 2.6, fn(p, s, T, A) { const h = hold(p, .18, .2); const f = loaded('foreR'), w = Math.sin(s * 10); T.armR.rot -= (f ? 95 : 135 + w * 14) * h;
+      if (f) T.foreR.rot -= (68 + w * 22) * h; T.head.rot += 4 * h; } },
   { id: 'nod', label: 'うなずく', need: ['head'], dur: 1.1, fn(p, s, T, A, u) { const d = Math.pow(Math.sin(p * Math.PI * 2), 2); T.head.ty += d * 16 * u * A; T.head.sy *= 1 - d * 0.045; T.body.ty += d * 3 * u; } },
   { id: 'tilt', label: '首をかしげる', need: ['head'], dur: 1.9, fn(p, s, T, A) { const h = hold(p, .2, .25); T.head.rot += 13 * h * A; T.body.rot += 2 * h; } },
   { id: 'banzai', label: 'ばんざい', need: ['armL', 'armR'], any: true, dur: 2.1, fn(p, s, T, A, u) { const h = hold(p, .2, .25);
-      T.armL.rot += 150 * h * A; T.armR.rot -= 150 * h * A; T.body.ty -= Math.abs(Math.sin(s * 9)) * 9 * u * h; } },
+      T.armL.rot += 140 * h; T.armR.rot -= 140 * h; T.foreL.rot += 14 * h; T.foreR.rot -= 14 * h; T.all.ty -= Math.abs(Math.sin(s * 9)) * 9 * u * h; } },
   { id: 'jump', label: 'ジャンプ', dur: 0.95, fn(p, s, T, A, u) {
       if (p < .18) T.all.sy *= 1 - .07 * ss(p / .18);
       else if (p < .82) { const q = (p - .18) / .64, a = Math.sin(q * Math.PI); T.all.ty -= 4 * q * (1 - q) * 120 * u * A; T.all.sy *= 1 + .04 * a; T.armL.rot += 26 * a; T.armR.rot -= 26 * a; }
       else T.all.sy *= 1 - .06 * (1 - ss((p - .82) / .18)); } },
   { id: 'bow', label: 'おじぎ', dur: 2.0, fn(p, s, T, A, u) { const h = hold(p, .25, .3); T.head.ty += 24 * u * h * A; T.head.sy *= 1 - .08 * h; T.all.sy *= 1 - .05 * h; } },
   { id: 'sway', label: '左右にゆれる', dur: 2.4, fn(p, s, T, A) { T.all.rot += Math.sin(s * 7.8) * 7 * hold(p, .15, .2) * A; } },
-  { id: 'joy', label: 'よろこぶ', dur: 1.7, fn(p, s, T, A, u) { const h = hold(p, .12, .2); T.all.ty -= Math.abs(Math.sin(s * 7.4)) * 46 * u * h * A; T.armL.rot += 42 * h * A; T.armR.rot -= 42 * h * A; T.head.rot += Math.sin(s * 7.4) * 4 * h; } },
-  { id: 'shock', label: 'びっくり', dur: 0.9, fn(p, s, T, A, u) { const k = 1 - ss(p); T.all.ty -= 34 * u * k * A; T.all.sy *= 1 + .07 * k; T.all.tx += Math.sin(s * 48) * 7 * u * k * A; T.armL.rot += 30 * k; T.armR.rot -= 30 * k; } },
+  { id: 'joy', label: 'よろこぶ', dur: 1.7, fn(p, s, T, A, u) { const h = hold(p, .12, .2); T.all.ty -= Math.abs(Math.sin(s * 7.4)) * 46 * u * h * A; T.armL.rot += 70 * h; T.armR.rot -= 70 * h; T.foreL.rot += 75 * h; T.foreR.rot -= 75 * h; T.head.rot += Math.sin(s * 7.4) * 4 * h; } },
+  { id: 'shock', label: 'びっくり', dur: 0.9, fn(p, s, T, A, u) { const k = 1 - ss(p); T.all.ty -= 34 * u * k * A; T.all.sy *= 1 + .07 * k; T.all.tx += Math.sin(s * 48) * 7 * u * k * A; T.armL.rot += 30 * k; T.armR.rot -= 30 * k; T.foreL.rot += 35 * k; T.foreR.rot -= 35 * k; } },
   { id: 'shiver', label: 'ふるえる', dur: 1.6, fn(p, s, T, A, u) { T.all.tx += Math.sin(s * 62) * 4.5 * u * hold(p, .1, .25) * A; } },
   { id: 'droop', label: 'しょんぼり', dur: 2.8, fn(p, s, T, A, u) { const h = hold(p, .25, .25); T.all.sy *= 1 - .05 * h; T.all.rot += 2 * h; T.head.rot += 9 * h * A; T.head.ty += 14 * u * h * A; } },
   { id: 'spin', label: 'くるっと回る', dur: 1.0, fn(p, s, T) { T.all.sx *= Math.cos(p * Math.PI * 2); } },
   { id: 'near', label: '近づく', dur: 2.4, fn(p, s, T, A) { const k = 1 + .38 * hold(p, .25, .25) * A; T.all.sx *= k; T.all.sy *= k; } },
-  { id: 'walk', label: '歩くふり', dur: 3.0, fn(p, s, T, A, u) { const h = hold(p, .12, .15), c = Math.sin(s * 7); T.all.ty -= Math.abs(c) * 11 * u * h * A; T.all.rot += c * 3 * h * A; T.armL.rot += c * 16 * h * A; T.armR.rot += c * 16 * h * A; } },
+  { id: 'walk', label: '歩くふり', dur: 3.0, fn(p, s, T, A, u) { const h = hold(p, .12, .15), c = Math.sin(s * 7); T.all.ty -= Math.abs(c) * 11 * u * h * A; T.all.rot += c * 3 * h * A; T.armL.rot += c * 7 * h; T.armR.rot += c * 7 * h; T.foreL.rot -= (10 + c * 8) * h; T.foreR.rot += (10 - c * 8) * h; } },
   { id: 'away', label: '外へ出てもどる', dur: 3.2, fn(p, s, T, A, u) { const h = hold(p, .3, .3); T.all.tx += h * st.doc.w * 2; T.all.rot += Math.sin(p * Math.PI * 2) * 6; T.all.ty -= Math.abs(Math.sin(s * 9)) * 8 * u * Math.sin(p * Math.PI); } },
-  { id: 'clap', label: 'はくしゅ', need: ['armL', 'armR'], dur: 2.0, fn(p, s, T, A) { const h = hold(p, .15, .2), c = Math.sin(s * 22) * 9; T.armL.rot -= (22 + c) * h * A; T.armR.rot += (22 + c) * h * A; } },
+  { id: 'clap', label: 'はくしゅ', need: ['armL', 'armR'], dur: 2.0, fn(p, s, T, A) { const h = hold(p, .15, .2), c = Math.sin(s * 20) * 7, f = loaded('foreL') && loaded('foreR');
+      if (f) { T.armL.rot += 35 * h; T.armR.rot -= 35 * h; T.foreL.rot -= (115 + c) * h; T.foreR.rot += (115 + c) * h; }
+      else { T.armL.rot -= (14 + c) * h; T.armR.rot += (14 + c) * h; } } },
 ];
+// arm helper: up = raise the upper arm outward, fl = bend the elbow (plus: same way as the raise, minus: inward)
+const arm = (T, sd, up, fl, h) => { const g = sd === 'L' ? 1 : -1; T['arm' + sd].rot += g * up * h; T['fore' + sd].rot += g * fl * h; };
+const BOTH = ['armL', 'foreL', 'armR', 'foreR'];
+POSES.push(
+  { id: 'handUp', cat: 'arm', label: '手をあげる', need: ['armL'], dur: 2.6, fn(p, s, T) { const h = hold(p, .15, .2); arm(T, 'L', 165, 8, h); T.head.rot -= 3 * h; } },
+  { id: 'bye', cat: 'arm', label: '両手をふる', need: ['armL', 'armR'], dur: 2.8, fn(p, s, T) { const h = hold(p, .15, .2), w = Math.sin(s * 10);
+      for (const sd of ['L', 'R']) loaded('fore' + sd) ? arm(T, sd, 95, 68 + w * 22, h) : arm(T, sd, 135 + w * 14, 0, h); } },
+  { id: 'cross', cat: 'arm', label: '手を前で組む', need: BOTH, dur: 3.0, fn(p, s, T) { const h = hold(p, .18, .2); arm(T, 'L', 12, -100, h); arm(T, 'R', 16, -92, h); } },
+  { id: 'hips', cat: 'arm', label: 'こしに手', need: BOTH, dur: 3.0, fn(p, s, T) { const h = hold(p, .18, .2); arm(T, 'L', 55, -80, h); arm(T, 'R', 55, -80, h); } },
+  { id: 'think', cat: 'arm', label: '考える', need: ['armR', 'foreR'], dur: 3.2, fn(p, s, T) { const h = hold(p, .18, .2); arm(T, 'R', 2, -152, h); T.head.rot += 7 * h; } },
+  { id: 'guts', cat: 'arm', label: 'ガッツポーズ', need: ['armR', 'foreR'], dur: 1.8, fn(p, s, T, A, u) { const h = hold(p, .15, .2); arm(T, 'R', 78 + Math.sin(s * 12) * 8, 100, h); T.all.ty -= Math.abs(Math.sin(s * 12)) * 6 * u * h; } },
+  { id: 'shrug', cat: 'arm', label: 'わからない', need: BOTH, dur: 2.2, fn(p, s, T, A, u) { const h = hold(p, .2, .25); arm(T, 'L', 12, 80, h); arm(T, 'R', 12, 80, h); T.all.ty -= 7 * u * h; T.head.rot += 6 * h; } },
+  { id: 'point', cat: 'arm', label: 'こちらです', need: ['armR'], dur: 2.6, fn(p, s, T) { const h = hold(p, .18, .2); arm(T, 'R', 82, 6, h); T.head.rot += 5 * h; } },
+  { id: 'stretch', cat: 'arm', label: 'のびをする', need: ['armL', 'armR'], dur: 3.0, fn(p, s, T, A, u) { const h = hold(p, .25, .25); arm(T, 'L', 168, 6, h); arm(T, 'R', 168, 6, h); T.all.sy *= 1 + .045 * h; T.head.ty -= 6 * u * h; } },
+  { id: 'dance', cat: 'arm', label: 'おどる', need: ['armL', 'armR'], dur: 4.0, fn(p, s, T, A, u) { const h = hold(p, .1, .12), c = Math.sin(s * 6);
+      arm(T, 'L', 60 + c * 45, 50, h); arm(T, 'R', 60 - c * 45, 50, h); T.all.rot += c * 5 * h; T.all.ty -= Math.abs(c) * 14 * u * h; T.head.rot -= c * 5 * h; } },
+  { id: 'gassho', cat: 'arm', label: '合掌', need: BOTH, dur: 3.2, fn(p, s, T, A, u) { const h = hold(p, .2, .22); arm(T, 'L', 16, -126, h); arm(T, 'R', 16, -126, h); T.head.ty += 9 * u * h; T.head.sy *= 1 - .03 * h; T.all.sy *= 1 - .015 * h; } },
+  { id: 'look', cat: 'head', label: 'きょろきょろ', need: ['head'], dur: 2.4, fn(p, s, T, A, u) { const h = hold(p, .12, .15), c = Math.sin(p * Math.PI * 4); T.head.rot += c * 9 * h; T.head.tx += c * 8 * u * h; } },
+  { id: 'no', cat: 'head', label: '首を横にふる', need: ['head'], dur: 1.3, fn(p, s, T, A, u) { const h = hold(p, .15, .2), c = Math.sin(s * 14); T.head.tx += c * 9 * u * h; T.head.rot += c * 3 * h; } },
+  { id: 'lookUp', cat: 'head', label: '見上げる', need: ['head'], dur: 2.2, fn(p, s, T, A, u) { const h = hold(p, .2, .25); T.head.ty -= 10 * u * h; T.head.rot -= 8 * h; T.head.sy *= 1 + .02 * h; } },
+  { id: 'bows', cat: 'all', label: 'ぺこぺこ', dur: 1.6, fn(p, s, T, A, u) { const d = Math.pow(Math.sin(p * Math.PI * 3), 2); T.head.ty += d * 20 * u; T.head.sy *= 1 - .06 * d; T.all.sy *= 1 - .04 * d; } },
+  { id: 'fall', cat: 'all', label: 'たおれる', dur: 2.6, fn(p, s, T, A, u) { const h = hold(p, .18, .25); T.all.rot += 86 * h; T.all.tx -= st.doc.h * 0.45 * h; T.all.ty -= st.doc.w * 0.2 * h + Math.sin(Math.min(1, p / .18) * Math.PI) * 20 * u; } },
+  { id: 'float', cat: 'all', label: 'ふわふわうく', dur: 4.0, fn(p, s, T, A, u) { const h = hold(p, .2, .2); T.all.ty -= (40 + Math.sin(s * 3) * 12) * u * h; T.all.rot += Math.sin(s * 1.5) * 3 * h; arm(T, 'L', 12, 0, h); arm(T, 'R', 12, 0, h); } },
+  { id: 'shrink', cat: 'all', label: '小さくなる', dur: 2.6, fn(p, s, T) { const k = 1 - .3 * hold(p, .2, .25); T.all.sx *= k; T.all.sy *= k; } },
+  { id: 'sleep', cat: 'all', label: 'ねむる', dur: 4.5, fn(p, s, T, A, u) { const h = hold(p, .2, .15); T.head.rot += (12 + Math.sin(s * 1.6) * 3) * h; T.head.ty += 10 * u * h; T.all.sy *= 1 + Math.sin(s * 1.6) * .012 * h; } }
+);
+{ const OLD = { waveL: 'arm', waveR: 'arm', banzai: 'arm', clap: 'arm', nod: 'head', tilt: 'head' }; POSES.forEach(p => { p.cat = p.cat || OLD[p.id] || 'all'; }); }
+const KEYS = { all: '12345qwertyuiopn', head: '67890', arm: 'asdfghjklzxcvbm' };
+{ const n = { all: 0, head: 0, arm: 0 }; POSES.forEach(p => { p.key = KEYS[p.cat][n[p.cat]++] || ''; }); }
 const active = {};
+function fire(id) { if (id === 'flip') { facing = -facing; return; } active[id] = performance.now() / 1000; }
 const poseOk = p => !p.need || (p.any ? p.need.some(loaded) : p.need.every(loaded));
 
 /* ---------- rig state ---------- */
@@ -565,7 +728,7 @@ function step(t, dt) {
   const kf = 1 - Math.exp(-dt * 22);
   // secondary motion: forearms and decorations trail behind what they hang from
   const play = st.view === 'play';
-  for (const id of ['foreL', 'foreR', 'ex1', 'ex2']) {
+  for (const id of ['ex1', 'ex2']) {
     const par = effParent(id); if (!par || !play) continue;
     const g = id.startsWith('fore') ? 0.45 : 0.9;
     T[id].rot += -g * (cur[par].rot - lag[par]) * st.amount;
@@ -607,8 +770,8 @@ function draw(t) {
   if (!st.doc) return;
   const D = st.doc, make = st.view === 'make';
   const fit = Math.min(cw / D.w, ch / D.h) * (make ? 0.86 : 0.92);
-  const z = make ? 1 : st.zoom, oy = make ? 0 : st.oy * ch;
-  VIEW = new DOMMatrix().translate(cw / 2, ch / 2 + oy).scale(fit * z, fit * z).translate(-D.w / 2, -D.h / 2);
+  const z = make ? 1 : st.zoom, oy = make ? 0 : st.oy * ch, ox = make ? 0 : st.ox * cw;
+  VIEW = new DOMMatrix().translate(cw / 2 + ox, ch / 2 + oy).scale(fit * z, fit * z).translate(-D.w / 2, -D.h / 2);
   if (!make) {
     const g = cur.all, gp = loaded('body') && st.pivots.body ? st.pivots.body : { x: D.w / 2, y: D.h };
     VIEW = VIEW.translate(g.tx, g.ty).translate(gp.x, gp.y).rotate(g.rot).scale(g.sx, g.sy).translate(-gp.x, -gp.y);
@@ -620,7 +783,7 @@ function draw(t) {
     const m = world(id); shown[id] = rec;
     ctx.setTransform(dpr * m.a, dpr * m.b, dpr * m.c, dpr * m.d, dpr * m.e, dpr * m.f);
     ctx.globalAlpha = make && st.sel !== id ? 0.5 : 1;
-    ctx.drawImage(rec.img, 0, 0, rec.w, rec.h);
+    const o = offOf(id); ctx.drawImage(rec.img, o.x, o.y, rec.w, rec.h);
   }
   ctx.globalAlpha = 1;
   if (make) drawPins();
@@ -649,7 +812,7 @@ function hit(x, y) {
   for (let i = st.order.length - 1; i >= 0; i--) {
     const id = st.order[i], rec = shown[id], m = Wm[id]; if (!rec || !m) continue;
     const p = m.inverse().transformPoint(new DOMPoint(x, y));
-    const i2 = Math.floor(p.x / rec.w * rec.mw), j2 = Math.floor(p.y / rec.h * rec.mh);
+    const o = offOf(id), i2 = Math.floor((p.x - o.x) / rec.w * rec.mw), j2 = Math.floor((p.y - o.y) / rec.h * rec.mh);
     if (i2 < 0 || j2 < 0 || i2 >= rec.mw || j2 >= rec.mh) continue;
     if (rec.mask[j2 * rec.mw + i2] > 24) return id;
   }
@@ -713,6 +876,9 @@ function renderMake() {
       tools = '<div class="tools">' +
         (s.choose ? `<select data-act="parent" data-slot="${s.id}" aria-label="どこにつけるか"><option value="head"${st.exParent[s.id] === 'head' ? ' selected' : ''}>頭につける</option><option value="body"${st.exParent[s.id] === 'body' ? ' selected' : ''}>体につける</option></select>` : '') +
         `<button class="btn" data-act="wig" data-slot="${s.id}">ゆらして確かめる</button>` +
+        '<span class="nlabel">絵の位置を少しずつ動かす</span>' +
+        [['nl', '←', '左へ'], ['nu', '↑', '上へ'], ['nd', '↓', '下へ'], ['nr', '→', '右へ'], ['n0', 'もどす', '位置をもどす']].map(([a, t, l]) => `<button class="btn sq" data-act="${a}" data-slot="${s.id}" aria-label="${l}">${t}</button>`).join('') +
+        '<span class="nlabel">重なりの順</span>' +
         `<button class="btn" data-act="front" data-slot="${s.id}">前に出す</button>` +
         `<button class="btn" data-act="back" data-slot="${s.id}">後ろにする</button>` +
         `<button class="btn warn" data-act="rm" data-slot="${s.id}">はずす</button></div>`;
@@ -735,20 +901,27 @@ const MODE_NOTE = {
   btn: 'ボタンをおすと、その動きをします。',
   touch: 'うでやかざりは、つまんで回せます。体や頭をなぞると、かたむきます。',
 };
-function poseButtons() {
-  return POSES.filter(poseOk).map(p => `<button class="btn" data-pose="${p.id}">${esc(p.label)}</button>`).join('') + '<button class="btn" data-pose="flip">向きを変える</button>';
+function poseButtons(heads) {
+  const btn = p => `<button class="btn" data-pose="${p.id}">${esc(p.label)}${p.key ? `<kbd>${p.key.toUpperCase()}</kbd>` : ''}</button>`, flip = '<button class="btn" data-pose="flip">向きを変える<kbd>←→</kbd></button>';
+  const ok = POSES.filter(poseOk);
+  if (!heads) return ok.map(btn).join('') + flip;
+  return [['all', '全身'], ['head', '頭'], ['arm', 'うで']].map(([c, name]) => {
+    const l = ok.filter(p => p.cat === c);
+    return l.length ? `<h3>${name}</h3>` + l.map(btn).join('') + (c === 'all' ? flip : '') : '';
+  }).join('');
 }
 function renderPlay() {
   document.querySelectorAll('.modes button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === st.mode));
   $('#modeNote').textContent = MODE_NOTE[st.mode];
   $('#autos').hidden = st.mode !== 'auto';
+  document.querySelectorAll('#voices button').forEach(b => b.setAttribute('aria-pressed', b.dataset.voice === st.voice));
   document.querySelectorAll('#autos button').forEach(b => b.setAttribute('aria-pressed', b.dataset.auto === st.auto));
-  $('#poses').hidden = st.mode !== 'btn'; $('#poses').innerHTML = poseButtons();
+  $('#poses').hidden = st.mode !== 'btn'; $('#poses').innerHTML = poseButtons(true);
   $('#strip').innerHTML = poseButtons(); $('#strip').classList.toggle('show', st.mode === 'btn');
   $('#touchTools').hidden = st.mode !== 'touch';
   document.querySelectorAll('#bgs [data-bg]').forEach(b => b.setAttribute('aria-pressed', b.dataset.bg === st.bg));
   $('#bgPhoto').setAttribute('aria-pressed', st.bg === 'photo');
-  $('#thr').value = st.thr; $('#zoom').value = st.zoom; $('#oy').value = st.oy; $('#amt').value = st.amount;
+  $('#thr').value = st.thr; $('#zoom').value = st.zoom; $('#oy').value = st.oy; $('#ox').value = st.ox; $('#amt').value = st.amount;
   $('#thrMark').style.left = (st.thr * 100) + '%';
 }
 function renderAll() {
@@ -771,6 +944,7 @@ $('#slots').addEventListener('click', e => {
   const id = b.dataset.slot, act = b.dataset.act;
   if (act === 'sel') { st.sel = id; }
   else if (act === 'wig') { wiggle = { id, until: performance.now() / 1000 + 2.2 }; return; }
+  else if (/^n[lrud0]$/.test(act)) { nudge(id, act); return; }
   else if (act === 'rm') { removeSlot(id); return; }
   else if (act === 'front' || act === 'back') {
     const i = st.order.indexOf(id), dir = act === 'front' ? 1 : -1;
@@ -796,8 +970,7 @@ document.querySelector('.modes').addEventListener('click', e => {
 });
 function firePose(e) {
   const b = e.target.closest('[data-pose]'); if (!b) return;
-  if (b.dataset.pose === 'flip') { facing = -facing; return; }
-  active[b.dataset.pose] = performance.now() / 1000;
+  fire(b.dataset.pose);
 }
 $('#poses').addEventListener('click', firePose); $('#strip').addEventListener('click', firePose);
 $('#unpose').onclick = () => { held = {}; };
@@ -806,6 +979,7 @@ $('#autos').addEventListener('click', e => { const b = e.target.closest('[data-a
 $('#thr').oninput = e => { st.thr = +e.target.value; $('#thrMark').style.left = (st.thr * 100) + '%'; saveSoon(); };
 $('#zoom').oninput = e => { st.zoom = +e.target.value; saveSoon(); };
 $('#oy').oninput = e => { st.oy = +e.target.value; saveSoon(); };
+$('#ox').oninput = e => { st.ox = +e.target.value; saveSoon(); };
 $('#amt').oninput = e => { st.amount = +e.target.value; saveSoon(); };
 $('#bgs').addEventListener('click', e => { const b = e.target.closest('button[data-bg]'); if (!b) return; st.bg = b.dataset.bg; saveSoon(); renderPlay(); });
 $('#bgFile').onchange = async e => {
@@ -821,6 +995,29 @@ for (const id of ['talk', 'ftalk']) {
   b.addEventListener('keyup', off); b.addEventListener('contextmenu', e => e.preventDefault());
 }
 $('#cleanBtn').onclick = () => { document.body.classList.add('clean'); };
+$('#voices').addEventListener('click', e => {
+  const b = e.target.closest('[data-voice]'); if (!b) return;
+  setVoice(b.dataset.voice); saveSoon(); renderPlay();
+  if (!mic.on && st.voice !== 'off') toast('「マイクを使う」をおすと、声が変わります。');
+});
+$('#monitor').onchange = e => { if (vox.ready) vox.mon.gain.value = e.target.checked ? 1 : 0; };
+$('#recBtn').onclick = () => { if (rec.mr) rec.mr.stop(); else recStart(); };
+$('#saveVid').onclick = recSave;
+$('#dropVid').onclick = () => { rec.blob = null; $('#saveBar').hidden = true; };
+
+/* keyboard: every motion has a key (shown on its button); space moves the mouth */
+const keyOf = e => { const c = e.code || ''; return c.startsWith('Key') ? c.slice(3).toLowerCase() : c.startsWith('Digit') ? c.slice(5) : c === 'Space' ? ' ' : (e.key || '').toLowerCase(); };
+const typing = e => { const t = e.target; return t && (t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type !== 'checkbox' && t.type !== 'file' && t.type !== 'range')); };
+window.addEventListener('keydown', e => {
+  if (st.view !== 'play' || e.metaKey || e.ctrlKey || e.altKey || typing(e)) return;
+  const k = keyOf(e);
+  if (k === ' ') { e.preventDefault(); mic.talk = true; return; }
+  if (e.repeat) return;
+  if (k === 'arrowleft' || k === 'arrowright') { if (e.target && e.target.type === 'range') return; e.preventDefault(); fire('flip'); return; }
+  const p = POSES.find(q => q.key === k && poseOk(q));
+  if (p) { e.preventDefault(); fire(p.id); }
+});
+window.addEventListener('keyup', e => { if (keyOf(e) === ' ') { e.preventDefault(); mic.talk = false; } });
 $('#back').onclick = () => { document.body.classList.remove('clean'); };
 
 /* ---------- boot ---------- */
@@ -838,7 +1035,7 @@ $('#back').onclick = () => { document.body.classList.remove('clean'); };
         }
         if (Object.keys(st.imgs).length) {
           Object.assign(st, { pivots: s.pivots || {}, pivotUser: s.pivotUser || {}, exParent: s.exParent || st.exParent,
-            mode: s.mode || 'auto', auto: AUTO[s.auto] ? s.auto : 'calm', bg: s.bg || 'mat', zoom: s.zoom || 1, oy: s.oy || 0, amount: s.amount || 1, thr: s.thr || 0.14 });
+            mode: s.mode || 'auto', auto: AUTO[s.auto] ? s.auto : 'calm', bg: s.bg || 'mat', zoom: s.zoom || 1, ox: s.ox || 0, oy: s.oy || 0, voice: s.voice || 'off', offs: s.offs || {}, amount: s.amount || 1, thr: s.thr || 0.14 });
           if (Array.isArray(s.order) && s.order.length === DEF_ORDER.length) st.order = s.order;
           st.sel = SLOTS.find(x => loaded(x.id)).id; refreshPivots(); restored = true;
         }
